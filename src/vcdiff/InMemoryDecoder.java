@@ -2,8 +2,6 @@ package vcdiff;
 
 import java.io.IOException;
 
-import vcdiff.ByteRange.EndOfInputException;
-
 class InMemoryDecoder {
   // Supported window indicator flags. At most one may be set.
   private static final int VCD_SOURCE = 1;
@@ -144,7 +142,7 @@ class InMemoryDecoder {
     // dataRange, or addrRange.
   }
 
-  private static int nextInstruction(ByteRange instRange, int lastInstruction) throws EndOfInputException {
+  private static int nextInstruction(ByteRange instRange, int lastInstruction) throws ByteRange.EndOfInputException {
     int nextInstruction = CodeTable.nextInstruction(lastInstruction);
     while (nextInstruction == 0 && !instRange.atEnd()) {
       nextInstruction = CodeTable.getInstructions(instRange.getByte() & 0xff);
