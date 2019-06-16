@@ -138,8 +138,7 @@ class InMemoryDecoder {
       throw new CodecException("Target window was not fully decoded");
     }
     // Compatibility note: we silentely ignore extra bytes at the end of
-    // deltaEncodingRange,
-    // dataRange, or addrRange.
+    // deltaEncodingRange, dataRange, or addrRange.
   }
 
   private static int nextInstruction(ByteRange instRange, int lastInstruction) throws ByteRange.EndOfInputException {
