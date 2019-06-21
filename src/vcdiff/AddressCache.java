@@ -1,5 +1,13 @@
 package vcdiff;
 
+/**
+ * Implements the VCDIFF address cache as defined in RFC 3284 section 5.1:
+ * Address Encoding Modes of COPY Instructions.
+ *
+ * <p>Since application-defined code tables are not suppored, only the standard
+ * values of S_NEAR and S_SAME need to be supported, though the implementation
+ * here is general enough that it could easily support custom parameters.
+ */
 class AddressCache {
   private final int nearSize;
   private final int sameSize;
