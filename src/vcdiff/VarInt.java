@@ -33,14 +33,15 @@ class VarInt {
   }
 
   /** Reads a variable-length encoded nonnegative integer as a 31-bit int. */
-  public static int readInt(ByteRange input) throws ByteRange.EndOfInputException, TooLargeException {
-    byte b = input.getByte();
+  public static int readInt(ByteViewReader input)
+      throws ByteViewReader.EndOfInputException, TooLargeException {
+    byte b = input.readByte();
     int i = b & 0x7f;
     while ((b & 0x80) != 0) {
       if (i > (Integer.MAX_VALUE >> 7)) {
         throw new TooLargeException("Integer value exceeds 31 bits");
       }
-      b = input.getByte();
+      b = input.readByte();
       i = (i << 7) | (b & 0x7f);
     }
     return i;

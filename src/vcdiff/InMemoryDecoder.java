@@ -22,24 +22,23 @@ class InMemoryDecoder {
   }
 
   public static byte[] decode(byte[] dictBytes, byte[] deltaBytes, int maxTargetSize) throws CodecException {
-    ByteRange deltaRange = new ByteRange(deltaBytes);
-    parseHeader(deltaRange);
+    ByteViewReader deltaSection = new ByteViewReader(new ByteView(deltaBytes));
+    parseHeader(deltaSection);
 
     // Scan the window sections to calculate the total target size before decoding.
-    int targetSize = calculateTargetSize(
-        new ByteRange(deltaBytes, deltaRange.position(), deltaRange.size()));
+    int targetSize = calculateTargetSize(new ByteViewReader(deltaSection));
     if (targetSize > maxTargetSize) {
       throw new TargetSizeExceededException(targetSize);
     }
 
-    byte[] targetBytes = new byte[targetSize];
-    ByteRange targetRange = new ByteRange(targetBytes);
-
     // Actual decoding loop.
-    while (!deltaRange.atEnd()) {
-      decodeNextWindow(new ByteRange(dictBytes), deltaRange, targetRange);
+    ByteView dictView = new ByteView(dictBytes);
+    byte[] targetBytes = new byte[targetSize];
+    ByteWriter targetView = new ByteWriter(targetBytes);
+    while (!deltaSection.atEnd()) {
+      decodeNextWindow(dictView, deltaSection, targetView);
     }
-    if (!targetRange.atEnd()) {
+    if (!targetView.atEnd()) {
       // This should be impossbible, since we've calculated the target size exactly above,
       // and if any window failed to decode entirely, then we should have thrown an error
       // earlier.
@@ -48,33 +47,33 @@ class InMemoryDecoder {
     return targetBytes;
   }
 
-  private static void parseHeader(ByteRange headerRange) throws CodecException {
-    if ((headerRange.getByte() & 0xff) != 0xd6 ||
-        (headerRange.getByte() & 0xff) != 0xc3 ||
-        (headerRange.getByte() & 0xff) != 0xc4) {
+  private static void parseHeader(ByteViewReader headerSection) throws CodecException {
+    if ((headerSection.readByte() & 0xff) != 0xd6 ||
+        (headerSection.readByte() & 0xff) != 0xc3 ||
+        (headerSection.readByte() & 0xff) != 0xc4) {
       throw new CodecException("Incorrect magic bytes");
     }
-    if (headerRange.getByte() != 0) {
+    if (headerSection.readByte() != 0) {
       throw new CodecException("Unsupported version byte");
     }
-    if (headerRange.getByte() != 0) {
+    if (headerSection.readByte() != 0) {
       throw new CodecException("Unsupported header indicator byte");
     }
   }
 
-  private static int calculateTargetSize(ByteRange deltaRange) throws CodecException {
+  private static int calculateTargetSize(ByteViewReader deltaSection) throws CodecException {
     int targetSize = 0;
-    while (!deltaRange.atEnd()) {
-      byte windowIndicator = deltaRange.getByte();
+    while (!deltaSection.atEnd()) {
+      byte windowIndicator = deltaSection.readByte();
       if (windowIndicator != 0) {
         if (windowIndicator != VCD_SOURCE && windowIndicator != VCD_TARGET) {
           throw new CodecException("Invalid window indicator byte");
         }
-        VarInt.readInt(deltaRange); // skip source segment size
-        VarInt.readInt(deltaRange); // skip source segment position
+        VarInt.readInt(deltaSection); // skip source segment size
+        VarInt.readInt(deltaSection); // skip source segment position
       }
-      ByteRange windowRange = deltaRange.getRange(VarInt.readInt(deltaRange));
-      int windowTargetSize = VarInt.readInt(windowRange);
+      ByteViewReader window = deltaSection.newSubReader(VarInt.readInt(deltaSection));
+      int windowTargetSize = VarInt.readInt(window);
       if (Integer.MAX_VALUE - targetSize < windowTargetSize) {
         throw new CodecException("Total target size exceeds 31 bits");
       }
@@ -83,37 +82,34 @@ class InMemoryDecoder {
     return targetSize;
   }
 
-  private static ByteRange decodeSourceSegment(ByteRange dictRange, ByteRange deltaRange, ByteRange targetRange)
+  private static ByteView decodeSourceSegment(ByteView dict, ByteWriter target, ByteViewReader window)
       throws CodecException {
-    byte windowIndicator = deltaRange.getByte();
+    byte windowIndicator = window.readByte();
     if (windowIndicator == 0) {
-      return ByteRange.EMPTY;
+      return ByteView.EMPTY;
     }
-    ByteRange refRange;
-    int refLen;
+    ByteView source;
     if (windowIndicator == VCD_SOURCE) {
-      refRange = dictRange;
-      refLen = dictRange.size();
+      source = dict;
     } else if (windowIndicator == VCD_TARGET) {
-      refRange = targetRange;
-      refLen = targetRange.position();
+      source = target.asByteView();
     } else {
       throw new CodecException("Invalid window indicator byte");
     }
-    int len = VarInt.readInt(deltaRange);
-    int pos = VarInt.readInt(deltaRange);
+    int len = VarInt.readInt(window);
+    int pos = VarInt.readInt(window);
     // This check suffices because len and pos must be nonnegative here.
-    if (refLen - pos < len) {
+    if (source.size() - pos < len) {
       throw new CodecException("Source segment out of range");
     }
-    return refRange.subRange(pos, pos + len);
+    return source.subView(pos, pos + len);
   }
 
-  private static void decodeNextWindow(ByteRange dictRange, ByteRange windowRange, ByteRange targetRange)
+  private static void decodeNextWindow(ByteView dict, ByteViewReader deltaWindow, ByteWriter target)
       throws CodecException {
-    ByteRange sourceSegment = decodeSourceSegment(dictRange, windowRange, targetRange);
-    ByteRange deltaEncodingRange = windowRange.getRange(VarInt.readInt(windowRange));
-    ByteRange targetWindow = targetRange.getRange(VarInt.readInt(deltaEncodingRange));
+    ByteView sourceSegment = decodeSourceSegment(dict, target, deltaWindow);
+    ByteViewReader deltaEncoding = deltaWindow.newSubReader(VarInt.readInt(deltaWindow));
+    ByteWriter targetWindow = target.newSubWriter(VarInt.readInt(deltaEncoding));
 
     // Combined size of source + target segment must fit in an integer.
     if (Integer.MAX_VALUE - sourceSegment.size() < targetWindow.size()) {
@@ -122,35 +118,38 @@ class InMemoryDecoder {
 
     // Skip delta indicator byte, which should be 0. The spec allows this to
     // contain compression flags, but we don't support secondary compression.
-    if (deltaEncodingRange.getByte() != 0) {
+    if (deltaEncoding.readByte() != 0) {
       throw new CodecException("Unsupported delta indicator byte");
     }
 
-    int dataLen = VarInt.readInt(deltaEncodingRange);
-    int instLen = VarInt.readInt(deltaEncodingRange);
-    int addrLen = VarInt.readInt(deltaEncodingRange);
-    ByteRange dataRange = deltaEncodingRange.getRange(dataLen);
-    ByteRange instRange = deltaEncodingRange.getRange(instLen);
-    ByteRange addrRange = deltaEncodingRange.getRange(addrLen);
-    AddressCache addrCache = new AddressCache(addrRange);
-    decodeInstructions(sourceSegment, targetWindow, dataRange, instRange, addrCache);
+    int dataLen = VarInt.readInt(deltaEncoding);
+    int instLen = VarInt.readInt(deltaEncoding);
+    int addrLen = VarInt.readInt(deltaEncoding);
+    ByteViewReader data = deltaEncoding.newSubReader(dataLen);
+    ByteViewReader inst = deltaEncoding.newSubReader(instLen);
+    ByteViewReader addr = deltaEncoding.newSubReader(addrLen);
+    AddressCache addrCache = new AddressCache(addr);
+    decodeInstructions(sourceSegment, targetWindow, data, inst, addrCache);
     if (!targetWindow.atEnd()) {
       throw new CodecException("Target window was not fully decoded");
     }
     // Compatibility note: we silentely ignore extra bytes at the end of
-    // deltaEncodingRange, dataRange, or addrRange.
+    // deltaEncoding, dataRange, and addrRange.
   }
 
-  private static int nextInstruction(ByteRange instRange, int lastInstruction) throws ByteRange.EndOfInputException {
+  private static int nextInstruction(ByteViewReader instRange, int lastInstruction)
+      throws ByteViewReader.EndOfInputException {
     int nextInstruction = CodeTable.nextInstruction(lastInstruction);
     while (nextInstruction == 0 && !instRange.atEnd()) {
-      nextInstruction = CodeTable.getInstructions(instRange.getByte() & 0xff);
+      nextInstruction = CodeTable.getInstructions(instRange.readByte() & 0xff);
     }
     return nextInstruction;
   }
 
-  private static void decodeInstructions(ByteRange sourceSegment, ByteRange targetWindow, ByteRange dataRange,
-      ByteRange instRange, AddressCache addrCache) throws CodecException {
+  private static void decodeInstructions(
+      ByteView sourceSegment, ByteWriter targetWindow,
+      ByteViewReader dataRange, ByteViewReader instRange,
+      AddressCache addrCache) throws CodecException {
     int instruction = 0;
     while ((instruction = nextInstruction(instRange, instruction)) != 0) {
       int type = CodeTable.instructionType(instruction);
@@ -167,33 +166,29 @@ class InMemoryDecoder {
       }
 
       if (type == CodeTable.ADD) {
-        while (size-- > 0) {
-          targetWindow.putByte(dataRange.getByte());
-        }
+        targetWindow.copyFrom(dataRange, size);
       } else if (type == CodeTable.RUN) {
-        byte b = dataRange.getByte();
-        while (size-- > 0) {
-          targetWindow.putByte(b);
-        }
+        byte b = dataRange.readByte();
+        targetWindow.writeRun(b, size);
       } else if (type == CodeTable.COPY) {
         int mode = CodeTable.instructionMode(instruction);
         int here = sourceSegment.size() + targetWindow.position();
-        int addr = addrCache.decodeAddress(here, mode);
         // Compatibility note: the specification does not mention if addr == here is allowed
         // if size == 0. open-vcdiff assumes it's not, so we will do the same here.
+        int addr = addrCache.decodeAddress(here, mode);
         if (addr < sourceSegment.size()) {
           // Copy from source segment.
           //
           // Compatibility note: the open-vcdiff decoder supports copying across the
           // boundary of source segment and target window. However, this is explicitly
           // forbidden by the spec (see RFC 3284, Section 3. Delta Instructions: "We shall
-          // that such a substring must be entirely contained in either S or T". So we do
-          // not allow this here. Since the open-vcdiff encoder does not generate such
-          // instructions itself, this should not cause any compatibility problems.
+          // assert that such a substring must be entirely contained in either S or T".
+          // So we do not allow this here. Since the open-vcdiff encoder does not generate
+          // such instructions itself, this should not cause any compatibility problems.
           if (size > sourceSegment.size() - addr) {
             throw new CodecException("Copy size exceeds source segment");
           }
-          targetWindow.copyNonOverlapping(sourceSegment, addr, size);
+          targetWindow.copyFrom(sourceSegment, addr, size);
         } else {
           // Copy from target window.
           targetWindow.copyFromThis(addr - sourceSegment.size(), size);
@@ -204,6 +199,5 @@ class InMemoryDecoder {
     }
   }
 
-  private InMemoryDecoder() {
-  }
+  private InMemoryDecoder() {}
 }

@@ -5,16 +5,16 @@ class AddressCache {
   private final int sameSize;
   private final int nearAddrs[];
   private final int sameAddrs[];
-  private final ByteRange addressRange;
+  private final ByteViewReader addresses;
   private int nextSlot = 0;
 
-  AddressCache(ByteRange addressRange) {
+  AddressCache(ByteViewReader addresses) {
     // Initialize cache using the standard code table parameters.
     nearSize = CodeTable.S_NEAR;
     sameSize = CodeTable.S_SAME;
     nearAddrs = new int[nearSize];
     sameAddrs = new int[sameSize * 256];
-    this.addressRange = addressRange;
+    this.addresses = addresses;
   }
 
   /**
@@ -35,10 +35,10 @@ class AddressCache {
 
   private int onlyDecodeAddress(int here, int mode) throws CodecException {
     if (mode == 0) { // VCD_SELF
-      return VarInt.readInt(addressRange);
+      return VarInt.readInt(addresses);
     }
     if (mode == 1) { // VCD_HERE
-      return here - VarInt.readInt(addressRange);
+      return here - VarInt.readInt(addresses);
     }
     if (mode < 2) {
       throw new CodecException("Invalid mode");
@@ -47,11 +47,11 @@ class AddressCache {
     if (m < nearSize) {
       // Since both addends must be positive, if the sum overflows, the result
       // must be negative, which we will detect in decodeAddress() above.
-      return nearAddrs[m] + VarInt.readInt(addressRange);
+      return nearAddrs[m] + VarInt.readInt(addresses);
     }
     m -= nearSize;
     if (m < sameSize) {
-      return sameAddrs[(m << 8) | (addressRange.getByte() & 0xff)];
+      return sameAddrs[(m << 8) | (addresses.readByte() & 0xff)];
     }
     throw new CodecException("Invalid mode");
   }
