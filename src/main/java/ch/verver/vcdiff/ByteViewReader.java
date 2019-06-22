@@ -1,7 +1,11 @@
 package ch.verver.vcdiff;
 
-// rename to byteviewreader?
 class ByteViewReader {
+  /**
+   * Exception thrown when an attempt is made to read past the end of the input.
+   *
+   * <p>Afterwards, the position of the reader is undefined.
+   */
   static class EndOfInputException extends CodecException {
     EndOfInputException() {
       super("Premature end of input buffer");

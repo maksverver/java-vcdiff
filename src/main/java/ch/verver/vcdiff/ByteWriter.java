@@ -3,6 +3,12 @@ package ch.verver.vcdiff;
 import java.util.Arrays;
 
 class ByteWriter {
+  /**
+   * Exception thrown when an attempt is made to write past the end of the output.
+   *
+   * <p>Afterwards, the position of the writer, and the contents of the array between the old
+   * and new position of the writer, are undefined.
+   */
   static class EndOfOutputException extends CodecException {
     EndOfOutputException() {
       super("Premature end of output buffer");
