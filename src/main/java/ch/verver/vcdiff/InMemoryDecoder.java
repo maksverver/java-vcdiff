@@ -1,7 +1,5 @@
 package ch.verver.vcdiff;
 
-import java.io.IOException;
-
 /**
  * Implementation of a safe, in-memory decoder of the VCDIFF file format.
  *
