@@ -3,7 +3,7 @@ package ch.verver.vcdiff;
 import java.util.Arrays;
 
 class ByteWriter {
-  public static class EndOfOutputException extends CodecException {
+  static class EndOfOutputException extends CodecException {
     EndOfOutputException() {
       super("Premature end of output buffer");
     }

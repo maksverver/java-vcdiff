@@ -11,12 +11,6 @@ class ByteView {
   private final byte[] data;
   private final int offset, length;
 
-  protected ByteView(ByteView original) {
-    this.data = original.data;
-    this.offset = original.offset;
-    this.length = original.length;
-  }
-
   ByteView(byte[] data) {
     this(data, 0, data.length);
   }

@@ -2,7 +2,7 @@ package ch.verver.vcdiff;
 
 // rename to byteviewreader?
 class ByteViewReader {
-  public static class EndOfInputException extends CodecException {
+  static class EndOfInputException extends CodecException {
     EndOfInputException() {
       super("Premature end of input buffer");
     }
@@ -16,11 +16,6 @@ class ByteViewReader {
 
   ByteViewReader(ByteView byteView) {
     this.byteView = byteView;
-  }
-
-  ByteViewReader(ByteViewReader original) {
-    byteView = original.byteView;
-    pos = original.pos;
   }
 
   int position() {
