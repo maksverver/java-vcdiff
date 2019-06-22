@@ -1,4 +1,4 @@
-package vcdiff;
+package ch.verver.vcdiff;
 
 /**
  * Implements the default VCDIFF code table as defined in RFC 3284 section 5.6:

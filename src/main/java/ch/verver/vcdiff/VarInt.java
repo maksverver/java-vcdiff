@@ -1,4 +1,4 @@
-package vcdiff;
+package ch.verver.vcdiff;
 
 /**
  * Utility class for decoding variable length integers.

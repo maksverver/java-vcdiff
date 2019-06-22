@@ -1,11 +1,11 @@
-package vcdiff;
+package ch.verver.vcdiff;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Locale;
 import java.nio.file.Files;
 
-public class Main {
+public class App {
   private static final String PRINT_CODE_TABLE_COMMAND = "printcodetable";
   private static final String DECODE_COMMAND = "decode";
 

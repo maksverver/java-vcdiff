@@ -1,4 +1,4 @@
-package vcdiff;
+package ch.verver.vcdiff;
 
 /** A read-only view of a substring of a byte array. */
 class ByteView {

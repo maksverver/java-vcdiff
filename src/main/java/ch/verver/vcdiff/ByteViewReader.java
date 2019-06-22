@@ -1,4 +1,4 @@
-package vcdiff;
+package ch.verver.vcdiff;
 
 // rename to byteviewreader?
 class ByteViewReader {

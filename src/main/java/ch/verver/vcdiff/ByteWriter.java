@@ -1,4 +1,4 @@
-package vcdiff;
+package ch.verver.vcdiff;
 
 import java.util.Arrays;
 
