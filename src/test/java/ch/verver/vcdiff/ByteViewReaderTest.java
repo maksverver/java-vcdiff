@@ -1,8 +1,8 @@
 package ch.verver.vcdiff;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 public class ByteViewReaderTest {
@@ -23,7 +23,7 @@ public class ByteViewReaderTest {
 
     assertThat(r.atEnd()).isTrue();
     assertThat(r.position()).isEqualTo(3);
-    assertThrows(ByteViewReader.EndOfInputException.class, () -> r.readByte());
+    assertReadByteThrowsEndOfInputException(r);
     assertThat(r.position()).isEqualTo(3);
   }
 
@@ -44,12 +44,12 @@ public class ByteViewReaderTest {
     assertThat(s2.readByte()).isEqualTo(13);
 
     assertThat(s1.atEnd()).isTrue();
-    assertThrows(ByteViewReader.EndOfInputException.class, () -> s1.readByte());
+    assertReadByteThrowsEndOfInputException(s1);
     assertThat(s2.atEnd()).isTrue();
-    assertThrows(ByteViewReader.EndOfInputException.class, () -> s2.readByte());
+    assertReadByteThrowsEndOfInputException(s2);
 
     assertThat(r.atEnd()).isFalse();  // 1 byte left
-    assertThrows(ByteViewReader.EndOfInputException.class, () -> r.newSubReader(2));
+    assertNewSubReaderThrowsEndOfInputException(r, 2);
   }
 
   @Test
@@ -62,6 +62,33 @@ public class ByteViewReaderTest {
     r.copyTo(out, 5, 0);
     assertThat(out).isEqualTo(new byte[]{3, 4, 5, 1, 2});
 
-    assertThrows(ByteViewReader.EndOfInputException.class, () -> r.copyTo(out, 0, 1));
+    assertCopyToThrowsEndOfInputException(r, out, 0, 1);
+  }
+
+  private static void assertReadByteThrowsEndOfInputException(ByteViewReader r) {
+    try {
+      r.readByte();
+      Assert.fail("Expected EndOfInputException to be thrown");
+    } catch (ByteViewReader.EndOfInputException unused) {
+      // expected
+    }
+  }
+
+  private static void assertNewSubReaderThrowsEndOfInputException(ByteViewReader r, int len) {
+    try {
+      r.newSubReader(len);
+      Assert.fail("Expected EndOfInputException to be thrown");
+    } catch (ByteViewReader.EndOfInputException unused) {
+      // expected
+    }
+  }
+
+  private static void assertCopyToThrowsEndOfInputException(ByteViewReader r, byte[] out, int pos, int len) {
+    try {
+      r.copyTo(out, pos, len);
+      Assert.fail("Expected EndOfInputException to be thrown");
+    } catch (ByteViewReader.EndOfInputException unused) {
+      // expected
+    }
   }
 }
