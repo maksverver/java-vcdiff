@@ -79,7 +79,7 @@ def Parse(filename):
                     dictionary_source_size_max = max(dictionary_source_size_max, size)
                 else:
                     assert source == VCD_TARGET
-                    if end >= target_size:
+                    if end > target_size:
                         return 'Target segment out of range'
                     target_source_count += 1
                     target_source_size_sum += size
