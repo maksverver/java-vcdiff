@@ -70,7 +70,7 @@ class ByteWriter {
 
   void copyFromThis(int pos, int len) throws EndOfOutputException {
     if (pos < 0 || pos >= this.pos) {
-      throw new IndexOutOfBoundsException(pos);
+      throw new IndexOutOfBoundsException();
     }
     int i = offset + pos;
     int j = offset + reserveCapacity(len);
