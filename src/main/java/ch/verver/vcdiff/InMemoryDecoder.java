@@ -153,7 +153,7 @@ public class InMemoryDecoder {
     if (source.size() - pos < len) {
       throw new CodecException("Source segment out of range");
     }
-    return source.subView(pos, pos + len);
+    return source.subView(pos, len);
   }
 
   private static void decodeNextWindow(ByteView dict, ByteViewReader deltaWindow, ByteWriter target)
