@@ -38,6 +38,10 @@ public class InMemoryDecoder {
     }
   }
 
+  // Indicates whether the decoder should reject delta files with excess bytes.
+  // Defaults to false, because the RFC doesn't explicitly state that such files are invalid.
+  private static final boolean REQUIRE_COMPACT_SECTIONS = false;
+
   // Supported window indicator flags. At most one may be set.
   private static final int VCD_SOURCE = 1;
   private static final int VCD_TARGET = 2;
@@ -181,11 +185,22 @@ public class InMemoryDecoder {
     ByteViewReader addr = deltaEncoding.newSubReader(addrLen);
     AddressCache addrCache = new AddressCache(addr);
     decodeInstructions(sourceSegment, targetWindow, data, inst, addrCache);
+    // Compatibility note: if REQUIRE_COMPACT_SECTIONS is false, then extra
+    // bytes at the end of deltaEncoding, data, and addr are silently ignored.
+    if (REQUIRE_COMPACT_SECTIONS) {
+      if (!data.atEnd()) {
+        throw new CodecException("Data section was not fully consumed");
+      }
+      if (!addr.atEnd()) {
+        throw new CodecException("Address section was not fully consumed");
+      }
+      if (!deltaEncoding.atEnd()) {
+        throw new CodecException("Extra bytes at end of delta encoding section");
+      }
+    }
     if (!targetWindow.atEnd()) {
       throw new CodecException("Target window was not fully decoded");
     }
-    // Compatibility note: we silentely ignore extra bytes at the end of
-    // deltaEncoding, dataRange, and addrRange.
   }
 
   private static int nextInstruction(ByteViewReader instRange, int lastInstruction)
