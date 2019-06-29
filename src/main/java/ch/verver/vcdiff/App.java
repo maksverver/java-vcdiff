@@ -6,8 +6,9 @@ import java.util.Locale;
 import java.nio.file.Files;
 
 public class App {
-  private static final String PRINT_CODE_TABLE_COMMAND = "printcodetable";
+  private static final String PRINT_CODE_TABLE_COMMAND = "print-codetable";
   private static final String DECODE_COMMAND = "decode";
+  private static final String GENERATE_RANDOM_COMMAND = "generate-random";
 
   public static void main(String... args) throws IOException, CodecException {
     if (args.length == 1 && PRINT_CODE_TABLE_COMMAND.equals(args[0])) {
@@ -23,10 +24,27 @@ public class App {
       return;
     }
 
+    if (args.length == 4 && GENERATE_RANDOM_COMMAND.equals(args[0])) {
+      int minDictSize = 12 << 20;  // 12 MiB
+      int maxDictSize = 18 << 20;  // 18 MiB
+      int minTargetSize = 12 << 20;  // 12 MiB
+      int maxTargetSize = 18 << 20;  // 18 MiB
+      int minNumWindows = 100;
+      int maxNumWindows = 150;
+      TestDataGenerator generator =
+          new TestDataGenerator(minDictSize, maxDictSize, minTargetSize, maxTargetSize, minNumWindows, maxNumWindows);
+      generator.generate();
+      Files.write(new File(args[1]).toPath(), generator.getDictionary());
+      Files.write(new File(args[2]).toPath(), generator.getDelta());
+      Files.write(new File(args[3]).toPath(), generator.getTarget());
+      return;
+    }
+
     System.out.println("Usage:\n\n\tjava vcdiff.Main <command> [<arguments>...]\n");
     System.out.println("Possible commands:\n");
     System.out.println("\t" + PRINT_CODE_TABLE_COMMAND);
     System.out.println("\t" + DECODE_COMMAND + " <dictionary> <delta> <target>");
+    System.out.println("\t" + GENERATE_RANDOM_COMMAND + " <dictionary> <delta> <target>");
   }
 
   private static void printDefaultCodeTable() {
